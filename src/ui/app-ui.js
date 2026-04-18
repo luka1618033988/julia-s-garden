@@ -539,7 +539,7 @@ export function createAppUi(root, appState) {
       try {
         const input = {
           real: control.real.value,
-          imaginary: control.imaginary.value,
+          imaginary: control.imaginary.value.trim() || "0",
         };
         parseComplexParts(input.real, input.imaginary);
         handlers?.onJumpTo?.(surface, input);

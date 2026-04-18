@@ -60,6 +60,11 @@ button:active {
   transform: translateY(1px);
 }
 
+input[aria-invalid="true"] {
+  border-color: rgba(255, 123, 123, 0.68);
+  box-shadow: 0 0 0 3px rgba(255, 123, 123, 0.12);
+}
+
 #app {
   width: min(1680px, calc(100vw - 28px));
   margin: 0 auto;
@@ -185,10 +190,56 @@ button:active {
   line-height: 1.45;
 }
 
+.custom-apply-row,
+.custom-seed-row,
 .complex-inputs {
   display: grid;
+  gap: 6px;
+}
+
+.custom-apply-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.custom-seed-row {
+  grid-template-columns: minmax(54px, 1fr) minmax(54px, 1fr) auto;
+}
+
+.custom-apply-row input,
+.custom-seed-row input {
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: 10px;
+  font-size: 0.86rem;
+}
+
+.custom-apply-row button,
+.custom-seed-row button {
+  padding: 7px 10px;
+}
+
+.draft-status {
+  min-width: 0;
+  max-width: 160px;
+  overflow: hidden;
+  color: var(--accent-2);
+  font-size: 0.76rem;
+  line-height: 1.2;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draft-status[data-state="draft"] {
+  color: var(--accent);
+}
+
+.draft-status[data-state="invalid"] {
+  color: var(--danger);
+}
+
+.complex-inputs {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
 }
 
 .field-row {
@@ -351,24 +402,72 @@ button:active {
 .canvas-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 12px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
 }
 
+.canvas-head-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
 .canvas-tools {
   display: flex;
-  gap: 8px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .panel-action {
-  padding: 6px 10px;
+  padding: 5px 8px;
+  font-size: 0.82rem;
 }
 
 .canvas-head h2 {
-  margin: 0;
+  margin: 6px 0 0;
   font-size: 1rem;
+}
+
+.jump-control {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 54px 54px auto;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.jump-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.jump-control input {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 7px;
+  border-radius: 9px;
+  font-size: 0.8rem;
+}
+
+.jump-error {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  max-width: min(280px, 80vw);
+  color: #ffd7d7;
+  font-size: 0.76rem;
+  line-height: 1.25;
+  text-align: right;
+  pointer-events: none;
+  z-index: 4;
 }
 
 .canvas-meta {
@@ -461,6 +560,67 @@ canvas {
   display: block;
 }
 
+.jump-marker {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 2px solid rgba(246, 184, 95, 0.95);
+  box-shadow:
+    0 0 0 1px rgba(7, 12, 22, 0.7),
+    0 0 22px rgba(246, 184, 95, 0.42);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.65);
+  z-index: 3;
+}
+
+.jump-marker::before,
+.jump-marker::after {
+  content: "";
+  position: absolute;
+  background: rgba(246, 184, 95, 0.95);
+}
+
+.jump-marker::before {
+  left: 50%;
+  top: -9px;
+  bottom: -9px;
+  width: 2px;
+  transform: translateX(-50%);
+}
+
+.jump-marker::after {
+  top: 50%;
+  left: -9px;
+  right: -9px;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.jump-marker.visible {
+  animation: jump-marker-pulse 900ms ease-out;
+}
+
+@keyframes jump-marker-pulse {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.55);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.6);
+  }
+}
+
 .canvas-overlay {
   position: absolute;
   inset: 0;
@@ -505,5 +665,17 @@ canvas {
   .status-bar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     min-height: auto;
+  }
+
+  .canvas-head {
+    display: grid;
+  }
+
+  .canvas-head-actions {
+    justify-content: stretch;
+  }
+
+  .jump-control {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
   }
 }

@@ -4,19 +4,7 @@ import { FORMULAS, createCustomFormula, getFormulaById } from "./formulas/regist
 import { LANDMARK_PRESETS } from "./rendering/landmarks.js";
 import { createAppUi } from "./ui/app-ui.js";
 import { createRenderCoordinator } from "./rendering/render-coordinator.js";
-
-function parseScalar(input) {
-  const value = String(input ?? "").trim().toLowerCase();
-  if (!value || value === "0") return 0;
-  if (value === "pi") return Math.PI;
-  if (value === "-pi") return -Math.PI;
-  if (value === "e") return Math.E;
-  if (value === "phi") return (1 + Math.sqrt(5)) / 2;
-  if (value === "-phi") return -((1 + Math.sqrt(5)) / 2);
-  const parsed = Number(value);
-  if (Number.isFinite(parsed)) return parsed;
-  throw new Error(`Could not parse "${input}" as a number.`);
-}
+import { parseComplexCoordinate, parseComplexParts } from "./math/complex-input.js";
 
 async function main() {
   const appState = createAppState({
@@ -95,9 +83,10 @@ async function main() {
     },
     onCustomSeedChange(realInput, imagInput) {
       try {
+        const seed = parseComplexParts(realInput, imagInput);
         appState.actions.setCustomSeed({
-          x: parseScalar(realInput),
-          y: parseScalar(imagInput),
+          x: seed.x,
+          y: seed.y,
           real: realInput.trim() || "0",
           imag: imagInput.trim() || "0",
         });
@@ -122,6 +111,24 @@ async function main() {
     onToggleGrid(surface) {
       const current = appState.getState().displayOptions[surface]?.showGrid;
       appState.actions.setDisplayOptions(surface, { showGrid: !current });
+    },
+    onJumpTo(surface, input) {
+      const point =
+        typeof input === "object" && input
+          ? parseComplexParts(input.real, input.imaginary)
+          : parseComplexCoordinate(input);
+      const key = `${surface}Viewport`;
+      const viewport = appState.getState()[key];
+      appState.actions.setViewport(key, {
+        ...viewport,
+        centerX: point.x,
+        centerY: point.y,
+      });
+      if (surface === "mandelbrot") {
+        appState.actions.setSelectedC(point);
+      }
+      appState.actions.setInteraction({ isInteracting: false, activeSurface: surface });
+      return point;
     },
     onExportSurface(surface) {
       coordinator.exportSurface(surface).catch((error) => {

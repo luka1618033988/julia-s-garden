@@ -1,4 +1,5 @@
-import { getFormulaById } from "../formulas/registry.js";
+import { createCustomFormula, getFormulaById } from "../formulas/registry.js";
+import { parseComplexParts } from "../math/complex-input.js";
 
 function mod(value, divisor) {
   return ((value % divisor) + divisor) % divisor;
@@ -112,6 +113,18 @@ function presetButtonMarkup(preset, source) {
   `;
 }
 
+function jumpControlMarkup(surface) {
+  return `
+    <form class="jump-control" data-jump-form="${surface}" novalidate>
+      <span class="jump-label">Go to</span>
+      <input id="${surface}-jump-real" type="text" inputmode="text" autocomplete="off" aria-label="Real coordinate" placeholder="Re" data-jump-real="${surface}" />
+      <input id="${surface}-jump-imaginary" type="text" inputmode="text" autocomplete="off" aria-label="Imaginary coordinate" placeholder="Im" data-jump-imaginary="${surface}" />
+      <button type="submit" class="ghost-button panel-action">Apply</button>
+      <span class="jump-error" data-jump-error="${surface}" aria-live="polite"></span>
+    </form>
+  `;
+}
+
 export function createAppUi(root, appState) {
   root.innerHTML = `
     <div class="layout">
@@ -142,16 +155,26 @@ export function createAppUi(root, appState) {
             <input id="degree-range" type="range" min="2" max="8" step="1" />
           </div>
           <div class="field" id="custom-formula-field">
-            <label for="custom-formula-input">Custom formula</label>
-            <input id="custom-formula-input" type="text" placeholder="Examples: z*z + c, c*sin(z), sin(z) + c" />
-            <div class="field-hint">Allowed: z, c, numbers, pi, e, phi, +, -, *, /, ^, parentheses, sin, cos, exp.</div>
+            <div class="field-row">
+              <label for="custom-formula-input">Custom formula</label>
+              <span class="draft-status" id="custom-formula-status">Applied</span>
+            </div>
+            <form class="custom-apply-row" id="custom-formula-form" novalidate>
+              <input id="custom-formula-input" type="text" placeholder="Examples: z*z + c, c*sin(z), sin(z) + c" />
+              <button id="custom-formula-apply" type="submit" class="ghost-button">Apply</button>
+            </form>
+            <div class="field-hint">Allowed: z, c, n, numbers, pi, π, e, phi, i, +, -, *, /, ^, parentheses, and registered functions.</div>
           </div>
           <div class="field" id="custom-seed-field">
-            <label>Custom start value z₀</label>
-            <div class="complex-inputs">
-              <input id="custom-seed-real" type="text" placeholder="real part, e.g. pi" />
-              <input id="custom-seed-imag" type="text" placeholder="imag part, e.g. 0" />
+            <div class="field-row">
+              <label>Custom start value z₀</label>
+              <span class="draft-status" id="custom-seed-status">Applied</span>
             </div>
+            <form class="custom-seed-row" id="custom-seed-form" novalidate>
+              <input id="custom-seed-real" type="text" aria-label="z0 real part" placeholder="Re" />
+              <input id="custom-seed-imag" type="text" aria-label="z0 imaginary part" placeholder="Im" />
+              <button id="custom-seed-apply" type="submit" class="ghost-button">Apply</button>
+            </form>
             <div class="field-hint">Used as the starting z value in the left parameter plane for custom formulas.</div>
           </div>
           <div class="field">
@@ -229,14 +252,18 @@ export function createAppUi(root, appState) {
           <article class="panel-shell canvas-card">
             <div class="canvas-head">
               <h2>Mandelbrot</h2>
-              <div class="canvas-tools">
-                <button type="button" class="ghost-button panel-action" data-reset-surface="mandelbrot">Reset</button>
-                <button type="button" class="ghost-button panel-action" data-toggle-grid="mandelbrot">Grid</button>
-                <button type="button" class="ghost-button panel-action" data-export-surface="mandelbrot">Export</button>
+              <div class="canvas-head-actions">
+                ${jumpControlMarkup("mandelbrot")}
+                <div class="canvas-tools">
+                  <button type="button" class="ghost-button panel-action" data-reset-surface="mandelbrot">Reset</button>
+                  <button type="button" class="ghost-button panel-action" data-toggle-grid="mandelbrot">Grid</button>
+                  <button type="button" class="ghost-button panel-action" data-export-surface="mandelbrot">Export</button>
+                </div>
               </div>
             </div>
             <div class="canvas-wrap">
               <canvas id="mandelbrot-canvas"></canvas>
+              <div class="jump-marker" data-jump-marker="mandelbrot"></div>
               <div class="grid-overlay" id="mandelbrot-grid">
                 <div class="grid-axis grid-axis-x"></div>
                 <div class="grid-axis grid-axis-y"></div>
@@ -250,14 +277,18 @@ export function createAppUi(root, appState) {
           <article class="panel-shell canvas-card">
             <div class="canvas-head">
               <h2>Julia</h2>
-              <div class="canvas-tools">
-                <button type="button" class="ghost-button panel-action" data-reset-surface="julia">Reset</button>
-                <button type="button" class="ghost-button panel-action" data-toggle-grid="julia">Grid</button>
-                <button type="button" class="ghost-button panel-action" data-export-surface="julia">Export</button>
+              <div class="canvas-head-actions">
+                ${jumpControlMarkup("julia")}
+                <div class="canvas-tools">
+                  <button type="button" class="ghost-button panel-action" data-reset-surface="julia">Reset</button>
+                  <button type="button" class="ghost-button panel-action" data-toggle-grid="julia">Grid</button>
+                  <button type="button" class="ghost-button panel-action" data-export-surface="julia">Export</button>
+                </div>
               </div>
             </div>
             <div class="canvas-wrap">
               <canvas id="julia-canvas"></canvas>
+              <div class="jump-marker" data-jump-marker="julia"></div>
               <div class="grid-overlay" id="julia-grid">
                 <div class="grid-axis grid-axis-x"></div>
                 <div class="grid-axis grid-axis-y"></div>
@@ -282,10 +313,16 @@ export function createAppUi(root, appState) {
     degree: root.querySelector("#degree-range"),
     degreeValue: root.querySelector("#degree-value"),
     customFormulaField: root.querySelector("#custom-formula-field"),
+    customFormulaForm: root.querySelector("#custom-formula-form"),
     customFormula: root.querySelector("#custom-formula-input"),
+    customFormulaApply: root.querySelector("#custom-formula-apply"),
+    customFormulaStatus: root.querySelector("#custom-formula-status"),
     customSeedField: root.querySelector("#custom-seed-field"),
+    customSeedForm: root.querySelector("#custom-seed-form"),
     customSeedReal: root.querySelector("#custom-seed-real"),
     customSeedImag: root.querySelector("#custom-seed-imag"),
+    customSeedApply: root.querySelector("#custom-seed-apply"),
+    customSeedStatus: root.querySelector("#custom-seed-status"),
     iterations: root.querySelector("#iterations-range"),
     iterationsValue: root.querySelector("#iterations-value"),
     palette: root.querySelector("#palette-select"),
@@ -309,6 +346,21 @@ export function createAppUi(root, appState) {
     juliaGrid: root.querySelector("#julia-grid"),
   };
 
+  const jumpControls = {
+    mandelbrot: {
+      real: root.querySelector('[data-jump-real="mandelbrot"]'),
+      imaginary: root.querySelector('[data-jump-imaginary="mandelbrot"]'),
+      error: root.querySelector('[data-jump-error="mandelbrot"]'),
+      marker: root.querySelector('[data-jump-marker="mandelbrot"]'),
+    },
+    julia: {
+      real: root.querySelector('[data-jump-real="julia"]'),
+      imaginary: root.querySelector('[data-jump-imaginary="julia"]'),
+      error: root.querySelector('[data-jump-error="julia"]'),
+      marker: root.querySelector('[data-jump-marker="julia"]'),
+    },
+  };
+
   const status = {
     formula: root.querySelector("#status-formula"),
     parameter: root.querySelector("#status-parameter"),
@@ -317,6 +369,63 @@ export function createAppUi(root, appState) {
   };
 
   let handlers = null;
+  let customFormulaDraft = appState.getState().customFormula ?? "";
+  let customSeedDraft = {
+    real: appState.getState().customSeed?.real ?? "0",
+    imag: appState.getState().customSeed?.imag ?? "0",
+  };
+  let lastAppliedCustomFormula = customFormulaDraft;
+  let lastAppliedCustomSeed = `${customSeedDraft.real}\n${customSeedDraft.imag}`;
+
+  function setDraftStatus(element, state, message = state) {
+    element.textContent = message;
+    element.dataset.state = state.toLowerCase();
+  }
+
+  function updateCustomFormulaDraftState() {
+    customFormulaDraft = controls.customFormula.value;
+    const nextFormula = customFormulaDraft.trim() || "z*z + c";
+    const dirty = nextFormula !== lastAppliedCustomFormula;
+    try {
+      createCustomFormula(nextFormula);
+      controls.customFormula.removeAttribute("aria-invalid");
+      controls.customFormulaApply.disabled = !dirty;
+      setDraftStatus(controls.customFormulaStatus, dirty ? "Draft" : "Applied");
+    } catch (error) {
+      controls.customFormula.setAttribute("aria-invalid", "true");
+      controls.customFormulaApply.disabled = true;
+      setDraftStatus(
+        controls.customFormulaStatus,
+        "Invalid",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
+
+  function updateCustomSeedDraftState() {
+    customSeedDraft = {
+      real: controls.customSeedReal.value,
+      imag: controls.customSeedImag.value,
+    };
+    const nextSeed = `${customSeedDraft.real.trim() || "0"}\n${customSeedDraft.imag.trim() || "0"}`;
+    const dirty = nextSeed !== lastAppliedCustomSeed;
+    try {
+      parseComplexParts(customSeedDraft.real.trim() || "0", customSeedDraft.imag.trim() || "0");
+      controls.customSeedReal.removeAttribute("aria-invalid");
+      controls.customSeedImag.removeAttribute("aria-invalid");
+      controls.customSeedApply.disabled = !dirty;
+      setDraftStatus(controls.customSeedStatus, dirty ? "Draft" : "Applied");
+    } catch (error) {
+      controls.customSeedReal.setAttribute("aria-invalid", "true");
+      controls.customSeedImag.setAttribute("aria-invalid", "true");
+      controls.customSeedApply.disabled = true;
+      setDraftStatus(
+        controls.customSeedStatus,
+        "Invalid",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
 
   controls.formula.addEventListener("change", () => {
     handlers?.onFormulaChange(controls.formula.value);
@@ -334,14 +443,62 @@ export function createAppUi(root, appState) {
   controls.degree.addEventListener("input", () => {
     handlers?.onDegreeChange(Number(controls.degree.value));
   });
-  controls.customFormula.addEventListener("change", () => {
-    handlers?.onCustomFormulaChange(controls.customFormula.value);
+  controls.customFormula.addEventListener("input", updateCustomFormulaDraftState);
+  controls.customFormula.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    controls.customFormula.value = lastAppliedCustomFormula;
+    updateCustomFormulaDraftState();
   });
-  controls.customSeedReal.addEventListener("change", () => {
-    handlers?.onCustomSeedChange?.(controls.customSeedReal.value, controls.customSeedImag.value);
+  controls.customFormulaForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const nextFormula = controls.customFormula.value.trim() || "z*z + c";
+    try {
+      createCustomFormula(nextFormula);
+      handlers?.onCustomFormulaChange(nextFormula);
+      controls.customFormula.value = nextFormula;
+      lastAppliedCustomFormula = nextFormula;
+      updateCustomFormulaDraftState();
+    } catch (error) {
+      controls.customFormula.setAttribute("aria-invalid", "true");
+      controls.customFormulaApply.disabled = true;
+      setDraftStatus(
+        controls.customFormulaStatus,
+        "Invalid",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   });
-  controls.customSeedImag.addEventListener("change", () => {
-    handlers?.onCustomSeedChange?.(controls.customSeedReal.value, controls.customSeedImag.value);
+  controls.customSeedReal.addEventListener("input", updateCustomSeedDraftState);
+  controls.customSeedImag.addEventListener("input", updateCustomSeedDraftState);
+  [controls.customSeedReal, controls.customSeedImag].forEach((input) => {
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      controls.customSeedReal.value = appState.getState().customSeed?.real ?? "0";
+      controls.customSeedImag.value = appState.getState().customSeed?.imag ?? "0";
+      updateCustomSeedDraftState();
+    });
+  });
+  controls.customSeedForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const real = controls.customSeedReal.value.trim() || "0";
+    const imag = controls.customSeedImag.value.trim() || "0";
+    try {
+      parseComplexParts(real, imag);
+      handlers?.onCustomSeedChange?.(real, imag);
+      controls.customSeedReal.value = real;
+      controls.customSeedImag.value = imag;
+      lastAppliedCustomSeed = `${real}\n${imag}`;
+      updateCustomSeedDraftState();
+    } catch (error) {
+      controls.customSeedReal.setAttribute("aria-invalid", "true");
+      controls.customSeedImag.setAttribute("aria-invalid", "true");
+      controls.customSeedApply.disabled = true;
+      setDraftStatus(
+        controls.customSeedStatus,
+        "Invalid",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   });
   controls.iterations.addEventListener("input", () => {
     handlers?.onIterationChange(Number(controls.iterations.value));
@@ -362,6 +519,40 @@ export function createAppUi(root, appState) {
   controls.savePreset.addEventListener("click", () => {
     handlers?.onSavePreset(controls.presetName.value);
     controls.presetName.value = "";
+  });
+
+  function showJumpMarker(surface) {
+    const marker = jumpControls[surface]?.marker;
+    if (!marker) return;
+    marker.classList.remove("visible");
+    marker.getBoundingClientRect();
+    marker.classList.add("visible");
+    window.setTimeout(() => marker.classList.remove("visible"), 950);
+  }
+
+  root.querySelectorAll("[data-jump-form]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const surface = form.dataset.jumpForm;
+      const control = jumpControls[surface];
+      if (!control) return;
+      try {
+        const input = {
+          real: control.real.value,
+          imaginary: control.imaginary.value.trim() || "0",
+        };
+        parseComplexParts(input.real, input.imaginary);
+        handlers?.onJumpTo?.(surface, input);
+        control.error.textContent = "";
+        control.real.removeAttribute("aria-invalid");
+        control.imaginary.removeAttribute("aria-invalid");
+        showJumpMarker(surface);
+      } catch (error) {
+        control.error.textContent = error instanceof Error ? error.message : String(error);
+        control.real.setAttribute("aria-invalid", "true");
+        control.imaginary.setAttribute("aria-invalid", "true");
+      }
+    });
   });
 
   root.addEventListener("click", (event) => {
@@ -422,9 +613,21 @@ export function createAppUi(root, appState) {
         state.activeFormulaId === "sine";
       controls.customSeedField.hidden = !showCustomSeed;
       controls.customSeedField.style.display = showCustomSeed ? "" : "none";
-      controls.customFormula.value = state.customFormula ?? "";
-      controls.customSeedReal.value = state.customSeed?.real ?? "0";
-      controls.customSeedImag.value = state.customSeed?.imag ?? "0";
+      const appliedFormula = state.customFormula ?? "";
+      if (appliedFormula !== lastAppliedCustomFormula) {
+        lastAppliedCustomFormula = appliedFormula;
+        controls.customFormula.value = appliedFormula;
+      }
+      const appliedSeedReal = state.customSeed?.real ?? "0";
+      const appliedSeedImag = state.customSeed?.imag ?? "0";
+      const appliedSeed = `${appliedSeedReal}\n${appliedSeedImag}`;
+      if (appliedSeed !== lastAppliedCustomSeed) {
+        lastAppliedCustomSeed = appliedSeed;
+        controls.customSeedReal.value = appliedSeedReal;
+        controls.customSeedImag.value = appliedSeedImag;
+      }
+      updateCustomFormulaDraftState();
+      updateCustomSeedDraftState();
       controls.iterations.value = String(state.renderSettings.maxIterations);
       controls.iterationsValue.textContent = String(state.renderSettings.maxIterations);
       controls.palette.value = state.renderSettings.palette;

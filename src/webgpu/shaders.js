@@ -17,7 +17,7 @@ fn complexNeg(a: vec2f) -> vec2f {
 }
 
 fn complexDiv(a: vec2f, b: vec2f) -> vec2f {
-  let denom = max(dot(b, b), 1e-20);
+  let denom = dot(b, b);
   return vec2f(
     (a.x * b.x + a.y * b.y) / denom,
     (a.y * b.x - a.x * b.y) / denom
@@ -38,7 +38,7 @@ fn complexPow(base: vec2f, degree: i32) -> vec2f {
 }
 
 fn complexLog(z: vec2f) -> vec2f {
-  let magnitude2 = max(dot(z, z), 1e-20);
+  let magnitude2 = dot(z, z);
   return vec2f(0.5 * log(magnitude2), atan2(z.y, z.x));
 }
 
@@ -65,6 +65,58 @@ fn complexCos(z: vec2f) -> vec2f {
 fn complexExp(z: vec2f) -> vec2f {
   let scale = exp(z.x);
   return vec2f(scale * cos(z.y), scale * sin(z.y));
+}
+
+fn complexTan(z: vec2f) -> vec2f {
+  return complexDiv(complexSin(z), complexCos(z));
+}
+
+fn complexSinh(z: vec2f) -> vec2f {
+  let ex = exp(z.x);
+  let enx = exp(-z.x);
+  let sinhX = 0.5 * (ex - enx);
+  let coshX = 0.5 * (ex + enx);
+  return vec2f(sinhX * cos(z.y), coshX * sin(z.y));
+}
+
+fn complexCosh(z: vec2f) -> vec2f {
+  let ex = exp(z.x);
+  let enx = exp(-z.x);
+  let sinhX = 0.5 * (ex - enx);
+  let coshX = 0.5 * (ex + enx);
+  return vec2f(coshX * cos(z.y), sinhX * sin(z.y));
+}
+
+fn complexTanh(z: vec2f) -> vec2f {
+  return complexDiv(complexSinh(z), complexCosh(z));
+}
+
+fn complexSqrt(z: vec2f) -> vec2f {
+  let magnitude = length(z);
+  let real = sqrt(max((magnitude + z.x) * 0.5, 0.0));
+  let signY = select(-1.0, 1.0, z.y >= 0.0);
+  let imag = signY * sqrt(max((magnitude - z.x) * 0.5, 0.0));
+  return vec2f(real, imag);
+}
+
+fn complexAbs(z: vec2f) -> vec2f {
+  return vec2f(length(z), 0.0);
+}
+
+fn complexArg(z: vec2f) -> vec2f {
+  return vec2f(atan2(z.y, z.x), 0.0);
+}
+
+fn complexConj(z: vec2f) -> vec2f {
+  return vec2f(z.x, -z.y);
+}
+
+fn complexRe(z: vec2f) -> vec2f {
+  return vec2f(z.x, 0.0);
+}
+
+fn complexIm(z: vec2f) -> vec2f {
+  return vec2f(z.y, 0.0);
 }
 
 ${formula.snippet}
